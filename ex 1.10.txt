@@ -1,0 +1,67 @@
+(A 1 10)
+a 0 a 1 9
+a 0 a 0 a 1 8
+...
+a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 1 2
+a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 1 1
+a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 2
+a 0 a 0 a 0 a 0 a 0 a 0 a 0 a 0 4
+a 0 a 0 a 0 a 0 a 0 a 0 a 0 8
+a 0 a 0 a 0 a 0 a 0 a 0 16
+a 0 a 0 a 0 a 0 a 0 32
+a 0 a 0 a 0 a 0 64
+a 0 a 0 a 0 128
+a 0 a 0 256
+a 0 512
+1024
+
+
+
+(a 2 4)
+a 1 a 2 3
+a 1 a 1 a 2 2
+a 1 a 1 a 1 a 2 1
+a 1 a 1 a 1 2
+a 1 a 1 a 0 a 1 1
+a 1 a 1 a 0 2
+a 1 a 1 4
+a 1 a 0 a 1 3
+a 1 a 0 a 0 a 1 2
+a 1 a 0 a 0 a 0 a 1 1
+a 1 a 0 a 0 a 0 2
+a 1 a 0 a 0 4
+a 1 a 0 8
+a 1 16 -- 2^16
+a 0 a 1 15
+
+=2^16=65536
+
+a 2 1 = 2       2^1     2^0    1
+a 2 2 = 4       2^2     2^1    2
+a 2 3 = 16      2^4     2^2    3
+a 2 4 = 65536   2^16    2^4    4
+                2^16^16 2^8   2^4    5
+                2           6
+
+
+
+
+(a 3 3)
+a 2 a 3 2
+a 2 a 2 a 3 1
+a 2 a 2 2
+a 2 a 1 a 2 1
+a 2 a 1 2
+..
+a 2 a 0 2
+a 2 4
+
+
+=2^16=65536
+
+
+
+(define (f n) (a 0 n)) = n*2
+(define (g n) (a 1 n)) = 2^n
+(define (h n) (a 2 n)) = 2^(h(n-1))
+(define (k n) (* 5 n n)) = 5n^2

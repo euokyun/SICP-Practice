@@ -1,11 +1,14 @@
 #lang sicp
-(define (sum-odd-squares tree)
-    (cond 
-        ((null? tree) 0)
-        ((not (pair? tree))
-            (if (odd? tree) (square tree) 0))
-        (else (+ (sum-odd-squares (car tree))
-                (sum-odd-squares (cdr tree))))))
+
+(define (square n) (* n n))
+
+; (define (sum-odd-squares tree)
+;     (cond 
+;         ((null? tree) 0)
+;         ((not (pair? tree))
+;             (if (odd? tree) (square tree) 0))
+;         (else (+ (sum-odd-squares (car tree))
+;                 (sum-odd-squares (cdr tree))))))
 
 (define (fib n)
     (define (fib-iter a b count)
@@ -13,13 +16,13 @@
             (fib-iter (+ a b) a (- count 1))))
     (fib-iter 1 0 n))
 
-(define (even-fibs n)
-    (define (next k) 
-        (if (> k n) '()
-            (let ((f (fib k)))
-                (if (even? f) (cons f (next (+ k 1)))
-                    (next (+ k 1))))))
-    (next 0))
+; (define (even-fibs n)
+;     (define (next k) 
+;         (if (> k n) '()
+;             (let ((f (fib k)))
+;                 (if (even? f) (cons f (next (+ k 1)))
+;                     (next (+ k 1))))))
+;     (next 0))
 
 
 (map square (list 1 2 3 4 5))
@@ -70,8 +73,8 @@
 
 (product-of-squares-of-odd-elements (list 1 2 3 4 5))
 
-(define (salary-of-highest-paid-programmer records)
-    (accumulate max 0 (map salary (filter programmer? records))))
+; (define (salary-of-highest-paid-programmer records)
+;     (accumulate max 0 (map salary (filter programmer? records))))
 
 ;;programmer? 프로그래머의 인사기록인지 판단
 ;;salary 봉급을 고르는 프로시저
@@ -91,15 +94,15 @@
 (define (prime? n)
     (= n (smallest-divisor n)))
 
-(enumerate-interval 1 n)
+; (enumerate-interval 1 n)
 
-(accumulate
-    append
-    '()
-    (map (lambda (i) 
-        (map (lambda (j) (list i j))
-            (enumerate-interval 1 (- i 1))))
-        (enumerate-interval 1 n)))
+; (accumulate
+;     append
+;     '()
+;     (map (lambda (i) 
+;         (map (lambda (j) (list i j))
+;             (enumerate-interval 1 (- i 1))))
+;         (enumerate-interval 1 n)))
 
 (define (flatmap proc seq)
     (accumulate append '() (map proc seq)))

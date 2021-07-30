@@ -1,5 +1,6 @@
 #lang sicp
 (define (average x y) (/ (+ x y) 2))
+(define (square x) (* x x))
 (define (cube x) (* x x x))
 (define (fixed-point f first-guess) 
     (define (close-enough? v1 v2) (< (abs (- v1 v2)) 0.00001))
@@ -17,7 +18,7 @@
     (fixed-point (average-damp (lambda (y) (/ x y))) 1.0))
 
 (define (cube-root x)
-    (fixed-point (average-damp (lambda (y) (/ x (square y)))) 1.0)))
+    (fixed-point (average-damp (lambda (y) (/ x (square y)))) 1.0))
 
 
 ;뉴튼 방법
@@ -41,21 +42,22 @@
 (define (fixed-point-of-transform g transform guess)
     (fixed-point (transform g) guess))
 
-(define (sqrt x)
+(define (sqrt-1 x)
     (fixed-point-of-transform 
-        (lambda (y) 
-            (/ x y))
+        (lambda (y) (/ x y))
         average-damp
         1.0))
 
 
-(define (sqrt x)
+(define (sqrt-2 x)
     (fixed-point-of-transform 
         (lambda (y) (- (square y) x))
         newton-transform
         1.0))
 
-(define (sqrt x) 
+(define (sqrt-3 x) 
     (newtons-method (lambda (y) (- (square y) x)) 1.0))
 
-(sqrt 25)
+(sqrt-1 25)
+(sqrt-2 25)
+(sqrt-3 25)

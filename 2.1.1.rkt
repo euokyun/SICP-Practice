@@ -7,33 +7,25 @@
 
 (define (add-rat x y)
     (make-rat
-        (+  (* (numer x) (denom y))
-            (* (numer y) (denom x)))
-            (* (denom x) (denom y))
-        ))
-
+        (+ (* (numer x) (denom y)) (* (numer y) (denom x)))
+        (* (denom x) (denom y))))
 (define (sub-rat x y)
     (make-rat
-        (-  (* (numer x) (denom y))
-            (* (numer y) (denom x)))
-            (* (denom x) (denom y))
-        ))
+        (- (* (numer x) (denom y)) (* (numer y) (denom x)))
+        (* (denom x) (denom y))))
 
 (define (mul-rat x y)
     (make-rat
-        (*  (* (numer x) (numer y)))
-            (* (denom x) (denom y))
-        ))
+        (* (numer x) (numer y))
+        (* (denom x) (denom y))))
 (define (div-rat x y)
     (make-rat
-        (*  (* (numer x) (denom y)) 
-            (* (denom x) (numer y))
-        )))
+        (* (numer x) (denom y))
+        (* (denom x) (numer y))))
 
 (define (equal-rat? x y)
     (= (* (numer x) (denom y))
-       (* (numer y) (denom x)
-    )))
+       (* (numer y) (denom x))))
 
 ;;scheme에서는 데이터의 쌍을 cons로 사용한다.
 ; (define x (cons 1 2))

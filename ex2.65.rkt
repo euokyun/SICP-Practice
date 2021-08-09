@@ -19,6 +19,7 @@
                                 (remaining-elts (cdr right-result)))
                                 (cons (make-tree this-entry left-tree right-tree) remaining-elts))))))))
     (car (partial-tree elements (length elements))))
+    
 (define (tree->list tree)
     (define (copy-to-list tree result-list)
         (if (null? tree)

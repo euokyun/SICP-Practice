@@ -23,12 +23,12 @@
                     (multiplicand exp))))
         ((exponentiation? exp)
             (make-product
-                (- (exponent exp) 1)
+                (exponent exp)
                 (make-exponentiation (base exp) (- (exponent exp) 1))))
         (else (error "unknown expression type -- DERIV" exp))))
 
 (define (exponentiation? x)
-    (and (pair? x) (eq? (car x) '^)))
+    (and (pair? x) (eq? (cadr x) '^)))
 (define (make-exponentiation e1 e2)
     (cond
         ((=number? e1 0) 0)
@@ -36,7 +36,7 @@
         ((=number? e2 0) 1)
         ((=number? e2 1) e1)
         ((and (number? e1) (number? e2)) (expt e1 e2))
-        (else (list '^ e1 e2))))
+        (else (list e1 '^ e2))))
 (define (base x)
     (if (exponentiation? x) (cadr x) x))
 (define (exponent x)

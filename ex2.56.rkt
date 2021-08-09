@@ -24,8 +24,6 @@
         ((and (number? m1) (number? m2)) (* m1 m2))
         (else (list '* m1 m2))))
 
-
-
 (define (deriv exp var)
     (cond ((number? exp) 0)
         ((variable? exp)
@@ -44,7 +42,7 @@
                     (multiplicand exp))))
         ((exponentiation? exp)
             (make-product
-                (- (exponent exp) 1)
+                (exponent exp)
                 (make-exponentiation (base exp) (- (exponent exp) 1))))
         (else (error "unknown expression type -- DERIV" exp))))
 
@@ -58,8 +56,6 @@
         ((=number? expo 1) base)
         ((and (number? base) (number? expo)) (expt base expo))
         (else (list '^ base expo))))
-
-
 (define (base x)
     (if (exponentiation? x) 
         (cadr x)
@@ -71,7 +67,7 @@
 (let ((test (make-exponentiation 1 'y)))
     (list test (exponentiation? test) (base test) (exponent test)))
 
-(deriv '(+ x 3) 'x)
-(deriv '(* x y) 'x)
-(deriv '(* (* x y) (+ x 3)) 'x)
-(deriv '(^ x 3) 'x)
+(deriv '(+ x 3) 'x) ; 1
+(deriv '(* x y) 'x) ; y
+(deriv '(* (* x y) (+ x 3)) 'x) ; (+ (* x y) (* y (+ x 3)))
+(deriv '(^ x 3) 'x) ; (* 3 (^ x 2))

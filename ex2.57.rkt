@@ -23,7 +23,7 @@
                     (multiplicand exp))))
         ((exponentiation? exp)
             (make-product
-                (- (exponent exp) 1)
+                (exponent exp)
                 (make-exponentiation (base exp) (- (exponent exp) 1))))
         (else (error "unknown expression type -- DERIV" exp))))
 

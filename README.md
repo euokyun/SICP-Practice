@@ -11,6 +11,7 @@ brew install minimal-racket
 ```
 and follow Magic Racket's instruction.
 
+[Notion link](https://productive-path-648.notion.site/SICP-4c0c533dcfbc447a9707bb01b7eb2e6c)(Korean)
 
 ## note
 * unlike [mit-scheme](https://www.gnu.org/software/mit-scheme/), racket don't allow re-define identifier. so some of my code has problems.

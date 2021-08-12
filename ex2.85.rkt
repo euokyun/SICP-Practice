@@ -168,10 +168,10 @@
     (put '=zero? '(rational) (lambda (n) (= 0 (numer n))))
     ; 2.83
     (put-coercion 'rational 'scheme-number (lambda (x) ; (display "r->n :") (display x) (newline)
-        (make-scheme-number (/ (car x) (cdr x)))))
+        (make-scheme-number (/ (numer x) (denom x)))))
     (put 'raise 'rational (lambda (x) ((get-coercion 'rational 'scheme-number) (contents x))))
     ; 2.85
-    (define (project x) (make-scheme-integer (numer (contents x))))
+    (define (project x) (make-scheme-integer (/ (numer (contents x)) (denom (contents x)))))
     (put 'project 'rational project)
     'done)
 
@@ -277,7 +277,7 @@
 (define cpx-1 (make-complex-from-real-imag 2 -1))
 (define cpx1 (make-complex-from-real-imag 2 1))
 (define cpx2 (make-complex-from-real-imag 1 2))
-
+; 2.83
 (define (raise v) ((get 'raise (type-tag v)) v))
 
 ; 2.84
@@ -322,7 +322,7 @@
 
 (drop cpx1)
 (drop (make-complex-from-real-imag 2 0)) ; (scheme-integer . 2)
-(drop (make-scheme-number 2)) ; (scheme-integer . 2)
+(drop (make-scheme-number (/ 2 2))) ; (scheme-integer . 2)
 (drop (add cpx1 cpx-1)) ; (scheme-integer . 4)
 ; after merge drop into apply-generic
 (add cpx1 cpx-1) ; (scheme-integer . 4)

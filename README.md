@@ -6,8 +6,10 @@ personal SCIP practice - on progress
 
 Extension : [Magic Racket](https://marketplace.visualstudio.com/items?itemName=evzen-wybitul.magic-racket)
 
-```
+```bash
 brew install minimal-racket
+raco pkg install sicp
+raco pkg install racket-langserver
 ```
 and follow Magic Racket's instruction.
 

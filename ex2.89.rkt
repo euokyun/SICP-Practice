@@ -51,13 +51,36 @@
         ((equal? (car m) (cadr m)) (list-equal? (cdr m)))
         (else #f)))
 (define (apply-generic op . args)
-    (define apply-coercion raise-to-top)
     (define (apply-generic-1 op args)
         (let ((type-tags (map type-tag args)))
             (let ((proc (get op type-tags)))
                 (if (not (null? proc)) (drop (apply proc (map contents args)))
-                    (apply-generic-1 op (apply-coercion args))))))
+                    (apply-generic-1 
+                        op 
+                        ((lambda (elems) 
+                            (let ((levelmap (map (lambda (x) (list-index (type-tag x) number-tower)) elems))) ; 인자가 하나면 에러남.
+                                (if (any (lambda (x) (eq? x #f)) levelmap) (error "error: not in type tree -- APPLY-COERCION" (list op elems))
+                                    (if (list-equal? levelmap) (map raise elems)
+                                        (let ((maxlevel (apply max levelmap)))
+                                            (apply map 
+                                                (lambda (e l) 
+                                                    (cond
+                                                        ((= l maxlevel) e)
+                                                        ((< l maxlevel) ((repeated raise (- maxlevel l)) e))))
+                                                (list elems levelmap)))))))
+                        args))))))
         (apply-generic-1 op args))
+(define (apply-coercion elems) 
+    (let ((levelmap (map (lambda (x) (list-index (type-tag x) number-tower)) elems))) ; 인자가 하나면 에러남.
+        (if (any (lambda (x) (eq? x #f)) levelmap) (error "error: not in type tree -- APPLY-COERCION" elems)
+            (if (list-equal? levelmap) (map raise elems)
+                (let ((maxlevel (apply max levelmap)))
+                    (apply map 
+                        (lambda (e l) 
+                            (cond
+                                ((= l maxlevel) e)
+                                ((< l maxlevel) ((repeated raise (- maxlevel l)) e))))
+                        (list elems levelmap)))))))
 (define (install-rectangular-package)
     (define real-part car)
     (define imag-part cdr)
@@ -203,6 +226,7 @@
 (install-rectangular-package)
 (install-polar-package)
 (install-rational-package)
+
 (define (make-scheme-integer n) ((get 'make 'scheme-integer) n))
 (define (make-scheme-number n) ((get 'make 'scheme-number) n))
 (define (make-rational n d) ((get 'make 'rational) n d))
@@ -253,17 +277,6 @@
 (define (sine x) (apply-generic 'sine x))
 (define (cosine x) (apply-generic 'cosine x))
 (define (arctangent x y) (apply-generic 'arctangent x y))
-(define (raise-to-top elems) 
-    (let ((levelmap (map (lambda (x) (list-index (type-tag x) number-tower)) elems))) ; 인자가 하나면 에러남.
-        (if (any (lambda (x) (eq? x #f)) levelmap) (error "error: not in type tree -- RAISE-TO-TOP" elems)
-            (if (list-equal? levelmap) (map raise elems)
-                (let ((maxlevel (apply max levelmap)))
-                    (apply map 
-                        (lambda (e l) 
-                            (cond
-                                ((= l maxlevel) e)
-                                ((< l maxlevel) ((repeated raise (- maxlevel l)) e))))
-                        (list elems levelmap)))))))
 (define (sqrt-number x) (apply-generic 'sqrt-number x))
 ; end 2.86
 
@@ -334,45 +347,97 @@
     (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
     ; 2.87
-    (define (=zero? z)
+    (define (=zero-poly? z)
         (define (=zero?-1 z)
             (cond
                 ((null? z) #t)
-                ((equ? (coeff (first-term z)) 0) (=zero?-1 (rest-terms z)))
+                ((=zero? (coeff (first-term z))) (=zero?-1 (rest-terms z)))
+                ; ((and (equ? (order (first-term z)) 0) (equ? (coeff (first-term z)) 0)) (=zero?-1 (rest-terms z)))
                 (else #f)))
         (if (empty-termlist? (term-list z)) #t
             (=zero?-1 (term-list z))))
-    (put '=zero? '(polynomial) =zero?)
+    (put '=zero? '(polynomial) =zero-poly?)
     ; 2.88
     (define (sub-poly p1 p2)
-        (let ((negative-term (list (make-term 0 -1))))
+        (let ((negative-term (make-term 0 -1)))
             (if (same-variable? (variable p1) (variable p2)) 
-                (make-poly (variable p1) (add-terms (term-list p1) (mul-terms (term-list p2) negative-term)))
+                (make-poly (variable p1) (add-terms (term-list p1) (mul-terms (term-list p2) (list negative-term))))
                 (error "Polys not in same var -- SUB-POLY" (list p1 p2)))))
     (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
     'done)
 (install-polynomial-package)
 (define (make-polynomial var terms) ((get 'make 'polynomial) var terms))
 
-; (define (make-term order coeff) (list order coeff))
-; (define (variable p) (car p))
-; (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
-; (define (first-term term-list) (car term-list))
-; (define (order term) (car term)) ; 차수
-; (define (coeff term) (cadr term)) ; 계수
-; (define (rest-terms term-list) (cdr term-list))
-; (define (empty-termlist? term-list) (null? term-list))
-; 2.88
-(define poly1 (make-polynomial 'x '((100 1) (2 2) (0 1))))
-(define poly1-1 (make-polynomial 'x '((2 2) (0 1))))
-(define poly2 (make-polynomial 'x '()))
-(define poly3 (make-polynomial 'x '((0 0))))
-(define poly-neg (make-polynomial 'x '((0 -1))))
-poly1 ; (polynomial x (100 1) (2 2) (0 1))
-poly2 ; (polynomial x)
-poly3 ; (polynomial x (0 0))
-(mul poly1 poly-neg) ; (polynomial x (100 (-1)) (2 (-2)) (0 (-1)))
-(mul poly-neg poly-neg) ; (polynomial x (0 (1)))
-(sub poly1 poly1-1) ; (polynomial x (100 1))
-(=zero? (add poly1 (mul poly1 poly-neg))) ; #t
+; 2.89
+(define (dense-polynomial-package)
+    (define (make-poly variable term-list) (cons variable term-list))
+    (define (variable p) (car p)) ; 다항식에서 변수를 찾아냄
+    (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
+    (define (the-empty-termlist) '()) ; generate empty term list
+    (define (empty-termlist? term-list) (null? term-list))
+    (define (first-term term-list) (car term-list))
+    (define (rest-terms term-list) (cdr term-list))
+    (define (order term) (car term)) ; 차수
+    (define (coeff term) (cadr term)) ; 계수
+    (define (repeat-0 n) (if (>= 0 n) '() (cons 0 (repeat-0 (- n 1)))))
+    (define (make-term order coeff) (append (list coeff) (repeat-0 order))) ; 마디를 만들어 내는 프로시저
+    (define (add-poly p1 p2)
+        (if (same-variable? (variable p1) (variable p2)) 
+            (make-poly (variable p1) (add-terms (term-list p1) (term-list p2)))
+            (error "Polys not in same var -- ADD-POLY" (list p1 p2))))
+    (define (mul-poly p1 p2)
+        (if (same-variable? (variable p1) (variable p2))
+            (make-poly (variable p1) (mul-terms (term-list p1) (term-list p2)))
+            (error "Polys not in same var -- MUL-POLY" (list p1 p2))))
+    (define (add-terms L1 L2)
+        (cond
+            ((empty-termlist? L1) L2)
+            ((empty-termlist? L2) L1)
+            (else 
+                (let ((L1l (length L1)) (L2l (length L2)))
+                    (cond
+                        ((> L1l L2l) (cons (first-term L1) (add-terms (rest-terms L1) L2)))
+                        ((< L1l L2l) (cons (first-term L2) (add-terms L1 (rest-terms L2))))
+                        (else 
+                            (let ((t1 (first-term L1)) (t2 (first-term L2)))
+                                (cons (add t1 t2) (add-terms (rest-terms L1) (rest-terms L2))))))))))
+    (define (mul-terms L1 L2)
+        (if (or (empty-termlist? L1) (empty-termlist? L2))  (the-empty-termlist)
+            (let ((L1l (length L1)) (t1 (first-term L1)))
+                (add-terms 
+                    (map (lambda (x) (mul t1 x)) (append L2 (repeat-0 (- L1l 1)))) 
+                    (mul-terms (rest-terms L1) L2)))))
+    (define (=zero-poly? z)
+        (define (=zero?-1 z)
+            (cond
+                ((null? z) #t)
+                ((=zero? (first-term z)) (=zero?-1 (rest-terms z)))
+                (else #f)))
+        (if (empty-termlist? (term-list z)) #t
+            (=zero?-1 (term-list z))))
+    (define (sub-poly p1 p2)
+        (let ((negative-term (make-term 0 -1)))
+            (if (same-variable? (variable p1) (variable p2)) 
+                (make-poly (variable p1) (add-terms (term-list p1) (mul-terms (term-list p2) negative-term)))
+                (error "Polys not in same var -- SUB-POLY" (list p1 p2)))))
+    (define (tag p) (attach-tag 'dense-poly p))
+    (put 'add '(dense-poly dense-poly) (lambda (p1 p2) (tag (add-poly p1 p2))))
+    (put 'mul '(dense-poly dense-poly) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+    (put 'make 'dense-poly (lambda (var terms) (tag (make-poly var terms))))
+    (put '=zero? '(dense-poly) =zero-poly?)
+    (put 'sub '(dense-poly dense-poly) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+    'done)
+
+(dense-polynomial-package)
+(define make-dense-poly (get 'make 'dense-poly))
+
+(define poly1 (make-dense-poly 'x '(1 2 0 3 -2 -5))) ; (dense-poly x 1 2 0 3 -2 -5)
+(define poly2 (make-dense-poly 'x '(3))) ; (dense-poly x 3)
+(define poly3 (make-dense-poly 'x '(0))) ; (dense-poly x 0)
+(define poly4 (make-dense-poly 'x (list poly1 0))) ; (dense-poly x (dense-poly x 1 2 0 3 -2 -5) 0)
+(add poly1 poly1) ; (dense-poly x 2 4 0 6 -4 -10)
+(mul poly1 poly2) ; (dense-poly x 3 6 0 9 -6 -15)
+(sub poly1 poly1) ; (dense-poly x 0 0 0 0 0 0)
 (=zero? (sub poly1 poly1)) ; #t
+
+; (mul poly2 poly4) ; number->poly 필요함.

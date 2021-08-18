@@ -334,16 +334,16 @@
     (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
     ; 2.87
-    (define (=zero? z)
+    (define (=zero-poly? z)
         (define (=zero?-1 z)
             (cond
                 ((null? z) #t)
-                ((equ? (coeff (first-term z)) 0) (=zero?-1 (rest-terms z)))
+                ((=zero? (coeff (first-term z))) (=zero?-1 (rest-terms z)))
                 ; ((and (equ? (order (first-term z)) 0) (equ? (coeff (first-term z)) 0)) (=zero?-1 (rest-terms z)))
                 (else #f)))
         (if (empty-termlist? (term-list z)) #t
             (=zero?-1 (term-list z))))
-    (put '=zero? '(polynomial) =zero?)
+    (put '=zero? '(polynomial) =zero-poly?)
     'done)
 (install-polynomial-package)
 (define (make-polynomial var terms) ((get 'make 'polynomial) var terms))
@@ -379,4 +379,5 @@ poly3 ; (polynomial x (0 0))
 (=zero? poly1) ; #f
 (=zero? poly2) ; #t
 (=zero? poly3) ; #t
-(=zero? (make-polynomial 'x '((100 0) (10 0) (1 0) (0 0))))
+(=zero? (make-polynomial 'x (list (list 3 poly3)(list 2 poly2)(list 1 poly1) '(0 0)))) ; #f
+(=zero? (make-polynomial 'x (list (list 3 poly3)(list 2 poly2) '(0 0)))) ; #t

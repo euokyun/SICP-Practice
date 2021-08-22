@@ -13,6 +13,7 @@
 (define (repeated f n) (if (> n 1) (compose f (repeated f (- n 1))) f))
 (define (attach-tag type-tag contents)
     (cond
+        ((integer? contents) contents) ; not showing (scheme-integer ) thing
         ; ((number? contents) contents)
         ; ((symbol? contents) contents)
         (else (cons type-tag contents))))
@@ -283,7 +284,7 @@
 (define (same-variable? v1 v2) (and (variable? v1) (variable? v2) (eq? v1 v2)))
 (define (variable? x) (symbol? x))
 
-(define (install-polynomial-package)
+(define (sparse-polynomial-package)
     ; 변수variable 하나와 마디 리스트term-list 하나를 묶어서 다항식polynomial을 만듦
     (define (make-poly variable term-list) (cons variable term-list))
     (define (variable p) (car p)) ; 다항식에서 변수를 찾아냄
@@ -342,10 +343,10 @@
                         (mul (coeff t1) (coeff t2)))
                     (mul-term-by-all-terms t1 (rest-terms L))))))
 
-    (define (tag p) (attach-tag 'polynomial p))
-    (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
-    (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
-    (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+    (define (tag p) (attach-tag 'sparse-poly p))
+    (put 'add '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (add-poly p1 p2))))
+    (put 'mul '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+    (put 'make 'sparse-poly (lambda (var terms) (tag (make-poly var terms))))
     ; 2.87
     (define (=zero-poly? z)
         (define (=zero?-1 z)
@@ -356,18 +357,15 @@
                 (else #f)))
         (if (empty-termlist? (term-list z)) #t
             (=zero?-1 (term-list z))))
-    (put '=zero? '(polynomial) =zero-poly?)
+    (put '=zero? '(sparse-poly) =zero-poly?)
     ; 2.88
     (define (sub-poly p1 p2)
         (let ((negative-term (make-term 0 -1)))
             (if (same-variable? (variable p1) (variable p2)) 
                 (make-poly (variable p1) (add-terms (term-list p1) (mul-terms (term-list p2) (list negative-term))))
                 (error "Polys not in same var -- SUB-POLY" (list p1 p2)))))
-    (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+    (put 'sub '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (sub-poly p1 p2))))
     'done)
-(install-polynomial-package)
-(define (make-polynomial var terms) ((get 'make 'polynomial) var terms))
-
 ; 2.89
 (define (dense-polynomial-package)
     (define (make-poly variable term-list) (cons variable term-list))
@@ -421,23 +419,79 @@
                 (make-poly (variable p1) (add-terms (term-list p1) (mul-terms (term-list p2) negative-term)))
                 (error "Polys not in same var -- SUB-POLY" (list p1 p2)))))
     (define (tag p) (attach-tag 'dense-poly p))
-    (put 'add '(dense-poly dense-poly) (lambda (p1 p2) (tag (add-poly p1 p2))))
-    (put 'mul '(dense-poly dense-poly) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'make 'dense-poly (lambda (var terms) (tag (make-poly var terms))))
     (put '=zero? '(dense-poly) =zero-poly?)
+    (put 'add '(dense-poly dense-poly) (lambda (p1 p2) (tag (add-poly p1 p2))))
+    (put 'mul '(dense-poly dense-poly) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'sub '(dense-poly dense-poly) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+    
+    (define (dense->sparse p)
+        (define (make-dense-term-to-sparse-term term-list)
+            (define (make-dense-term-to-sparse-term-1 order terms)
+                (if (>= order 0) (cons (list order (car terms)) (make-dense-term-to-sparse-term-1 (- order 1) (cdr terms)))
+                    '()))
+            (make-dense-term-to-sparse-term-1 (- (length term-list) 1) term-list))
+        (if (eq? (type-tag p) 'sparse-poly) p
+            ((get 'make 'sparse-poly) (variable (contents p)) (make-dense-term-to-sparse-term (term-list (contents p))))))
+    (put 'dense->sparse 'dense-poly (lambda (x) (dense->sparse x)))
     'done)
 
 (dense-polynomial-package)
-(define make-dense-poly (get 'make 'dense-poly))
+(sparse-polynomial-package)
 
-(define poly1 (make-dense-poly 'x '(1 2 0 3 -2 -5))) ; (dense-poly x 1 2 0 3 -2 -5)
-(define poly2 (make-dense-poly 'x '(3))) ; (dense-poly x 3)
-(define poly3 (make-dense-poly 'x '(0))) ; (dense-poly x 0)
-(define poly4 (make-dense-poly 'x (list poly1 0))) ; (dense-poly x (dense-poly x 1 2 0 3 -2 -5) 0)
-(add poly1 poly1) ; (dense-poly x 2 4 0 6 -4 -10)
-(mul poly1 poly2) ; (dense-poly x 3 6 0 9 -6 -15)
-(sub poly1 poly1) ; (dense-poly x 0 0 0 0 0 0)
-(=zero? (sub poly1 poly1)) ; #t
+(define (install-polynomial-package)
+    (define (variable p) (car p))
+    (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
+    (define make-dense-poly (get 'make 'dense-poly))
+    (define make-sparse-poly (get 'make 'sparse-poly))
+    (define dense->sparse (get 'dense->sparse 'dense-poly))
+    ; (define (first-term term-list) (car term-list))
+    (define (dense? term-list)
+        (cond 
+            ((null? term-list) #t) 
+            ((not (pair? (car term-list))) #t)
+            (else #f)))
+    (define (sparse? term-list)
+        (cond 
+            ((null? term-list) #t)
+            ((pair? term-list) (pair? (car term-list)))
+            (else #f)))
+    (define (make-poly variable term-list)
+        (cond 
+            ((dense? term-list) (make-dense-poly variable term-list))
+            ((sparse? term-list) (make-sparse-poly variable term-list))
+            (else (error "term-list not valid -- MAKE-POLY" term-list))))
+    
+    (define (add-poly p1 p2) 
+        (if (eq? (type-tag p1) (type-tag p2)) (add p1 p2)
+            (add (dense->sparse p1) (dense->sparse p2))))
+    (define (mul-poly p1 p2) 
+        (if (eq? (type-tag p1) (type-tag p2)) (mul p1 p2)
+            (mul (dense->sparse p1) (dense->sparse p2))))
+    (define (sub-poly p1 p2) 
+        (if (eq? (type-tag p1) (type-tag p2)) (sub p1 p2)
+            (sub (dense->sparse p1) (dense->sparse p2))))
+    
+    ; (define (max-order p)
+    ;     (if (dense? p) (- (length (term-list (contents p))) 1)
+    ;         (- (length (first-term (contents p))) 1)))
 
-; (mul poly2 poly4) ; number->poly 필요함.
+    (define (tag p) (attach-tag 'polynomial p))
+    (put 'make 'polynomial (lambda (var terms) (tag (make-poly var terms))))
+    (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (add-poly p1 p2))))
+    (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
+    (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
+    (put '=zero? '(polynomial) (lambda (x) (=zero? x)))
+    'done)
+(install-polynomial-package)
+(define make-poly (get 'make 'polynomial))
+(define p1 (make-poly 'x '((3 1) (2 2) (1 3) (0 4))))
+(define p2 (make-poly 'x '(1 2 3 4)))
+
+(add p1 p2) ; (polynomial sparse-poly x (3 2) (2 4) (1 6) (0 8))
+(add p1 p1) ; (polynomial sparse-poly x (3 2) (2 4) (1 6) (0 8))
+(add p2 p2) ; (polynomial dense-poly x 2 4 6 8)
+(mul p1 p2) ; (polynomial sparse-poly x (6 1) (5 4) (4 10) (3 20) (2 25) (1 24) (0 16))
+(sub p1 p2) ; (polynomial sparse-poly x)
+(=zero? (mul p1 p2)) ; #f
+(=zero? (sub p1 p2)) ; #t

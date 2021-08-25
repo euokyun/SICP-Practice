@@ -218,7 +218,7 @@
     (put 'add '(scheme-integer scheme-integer) (lambda (x y) (tag (+ x y))))
     (put 'sub '(scheme-integer scheme-integer) (lambda (x y) (tag (- x y))))
     (put 'mul '(scheme-integer scheme-integer) (lambda (x y) (tag (* x y))))
-    (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
+    ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
     ; (put 'make 'scheme-integer (lambda (x) (tag x)))
     (put 'make 'scheme-integer (lambda (x) (tag x)))
     ; 2.79

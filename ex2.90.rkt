@@ -213,7 +213,7 @@
     (put 'add '(scheme-integer scheme-integer) (lambda (x y) (tag (+ x y))))
     (put 'sub '(scheme-integer scheme-integer) (lambda (x y) (tag (- x y))))
     (put 'mul '(scheme-integer scheme-integer) (lambda (x y) (tag (* x y))))
-    (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
+    ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
     (put 'make 'scheme-integer (lambda (x) (tag x)))
     (put 'equ? '(scheme-integer scheme-integer) (lambda (n1 n2) (= n1 n2)))
     (put '=zero? '(scheme-integer) (lambda (n) (= 0 n)))
@@ -424,7 +424,7 @@
     (put 'add '(dense-poly dense-poly) (lambda (p1 p2) (tag (add-poly p1 p2))))
     (put 'mul '(dense-poly dense-poly) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'sub '(dense-poly dense-poly) (lambda (p1 p2) (tag (sub-poly p1 p2))))
-    
+    ; 2.90
     (define (dense->sparse p)
         (define (make-dense-term-to-sparse-term term-list)
             (define (make-dense-term-to-sparse-term-1 order terms)
@@ -438,7 +438,7 @@
 
 (dense-polynomial-package)
 (sparse-polynomial-package)
-
+; 2.90
 (define (install-polynomial-package)
     (define (variable p) (car p))
     (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 

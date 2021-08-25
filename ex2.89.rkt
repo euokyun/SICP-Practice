@@ -212,7 +212,7 @@
     (put 'add '(scheme-integer scheme-integer) (lambda (x y) (tag (+ x y))))
     (put 'sub '(scheme-integer scheme-integer) (lambda (x y) (tag (- x y))))
     (put 'mul '(scheme-integer scheme-integer) (lambda (x y) (tag (* x y))))
-    (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
+    ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
     (put 'make 'scheme-integer (lambda (x) (tag x)))
     (put 'equ? '(scheme-integer scheme-integer) (lambda (n1 n2) (= n1 n2)))
     (put '=zero? '(scheme-integer) (lambda (n) (= 0 n)))

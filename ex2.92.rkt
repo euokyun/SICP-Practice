@@ -19,9 +19,11 @@
         (else (cons type-tag contents))))
 (define (type-tag datum)
     (cond
+        ((boolean? datum) 'boolean)
         ((integer? datum) 'scheme-integer)
-        ((number? datum) 'scheme-number)
-        ; ((symbol? datum) 'symbol)
+        ; ((number? datum) 'scheme-number)
+        ((real? datum) 'scheme-number)
+        ; ((symbol? datum) 'symbol)1
         ((pair? datum) (car datum))
         (else (error "bad tagged datum -- TYPE-TAG" datum))))
 (define (contents datum)
@@ -41,6 +43,7 @@
         ((pair? lists) (if (proc (car lists)) #t (any proc (cdr lists))))
         (else (proc lists))))
 (define (drop v)
+    (display "drop: ") (display v) (newline)
     (if (or (boolean? v) 
             (not (element-of-set? (type-tag v) number-tower)) 
             (eq? (type-tag v) (car number-tower))) 
@@ -48,7 +51,12 @@
         (let ((subtyped (project v)))
             (if (equal? v (raise subtyped)) (drop subtyped) 
                 v))))
-
+(define (filter predicate sequence)
+    (cond 
+        ((null? sequence) '())
+        ((predicate (car sequence))
+            (cons (car sequence) (filter predicate (cdr sequence))))
+        (else (filter predicate (cdr sequence)))))
 
 
 (define (list-equal? m)
@@ -57,15 +65,18 @@
         ((null? (cdr m)) #t)
         ((equal? (car m) (cadr m)) (list-equal? (cdr m)))
         (else #f)))
+; (define drop-blacklist-operators '(equ?))
 (define (apply-generic op . args)
     (define (apply-generic-1 op args)
         (let ((type-tags (map type-tag args)))
             (let ((proc (get op type-tags)))
-                (if (not (null? proc)) (drop (apply proc (map contents args)))
+                (if (not (null? proc)) (apply proc (map contents args))
+                ; (if (not (null? proc)) (drop (apply proc (map contents args)))
                     (apply-generic-1 
                         op 
                         ((lambda (elems) 
                             (let ((levelmap (map (lambda (x) (list-index (type-tag x) number-tower)) elems)))
+                                (display "levelmap")(display elems) (display levelmap)(newline)
                                 (if (any (lambda (x) (eq? x #f)) levelmap) 
                                     (error "error: not in type tree -- APPLY-COERCION" (list op elems))
                                     (if (list-equal? levelmap) (map raise elems)
@@ -77,7 +88,8 @@
                                                         ((< l maxlevel) ((repeated raise (- maxlevel l)) e))))
                                                 (list elems levelmap)))))))
                         args))))))
-        (apply-generic-1 op args))
+    ; (display "apply-generic ") (display op) (display (element-of-set? op drop-blacklist-operators)) (newline)
+    (apply-generic-1 op args))
 
 (define (install-rectangular-package)
     (define real-part car)
@@ -95,7 +107,7 @@
     (put 'angle '(rectangular) angle)
     (put 'make-from-real-imag 'rectangular (lambda (x y) (tag (make-from-real-imag x y))))
     (put 'make-from-mag-ang 'rectangular (lambda (x y) (tag (make-from-mag-ang x y))))
-    (put '=zero? '(rectangular) (lambda (z) (and (= (real-part z) 0) (= (imag-part z) 0))))
+    (put '=zero? '(rectangular) (lambda (z) (and (equ? (real-part z) 0) (= (imag-part z) 0))))
     'done)
 
 (define (install-polar-package)
@@ -170,6 +182,7 @@
     (put-coercion 'rational 'scheme-number (lambda (x) (make-scheme-number (/ (car x) (cdr x)))))
     (put 'raise 'rational (lambda (x) ((get-coercion 'rational 'scheme-number) (contents x))))
     (put 'project 'rational (lambda (x) (make-scheme-integer (numer (contents x)))))
+    ; (put 'project 'rational (lambda (x) (numer (contents x))))
     'done)
 
 (define (install-complex-package)
@@ -209,6 +222,9 @@
         (make-complex-from-real-imag (+ (real-part z) x) (imag-part z)))
     (put 'add '(complex scheme-number) add-complex-to-schemenum)
     (put 'project 'complex (lambda (x) (make-scheme-number (real-part x))))
+
+    (put 'raise 'complex (lambda (x) ((get-coercion 'complex 'polynomial) (contents x))))
+
     'done)
 
 (define (install-scheme-integer-package)
@@ -225,7 +241,7 @@
     (put 'raise 'scheme-integer (lambda (x) ((get-coercion 'scheme-integer 'rational) (contents x))))
     'done)
 
-(install-scheme-integer-package)
+(install-scheme-integer-package) ; 2.92 -- integer 타입은 너무 문제가 많이 발생함
 (install-scheme-number-package)
 (install-rectangular-package)
 (install-polar-package)
@@ -268,6 +284,7 @@
             (else (list-index-1 x (cdr s) (+ index 1)))))
     (list-index-1 x set 0))
 
+; (define number-tower (list 'rational 'scheme-number 'complex))
 (define number-tower (list 'scheme-integer 'rational 'scheme-number 'complex))
 (define (project v) (let ((subtype (get 'project (type-tag v)))) 
     (if (procedure? subtype) (subtype v) 
@@ -290,25 +307,25 @@
 (define (same-variable? v1 v2) (and (variable? v1) (variable? v2) (eq? v1 v2)))
 (define (variable? x) (symbol? x))
 
+
+(define (variable p) (car p)) ; 다항식에서 변수를 찾아냄
+(define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
+(define (adjoin-term term term-list) 
+    (if (=zero? (coeff term)) term-list
+        (cons term term-list)))
+(define (the-empty-termlist) '()) ; generate empty term list
+(define (empty-termlist? term-list) (null? term-list))
+(define (first-term term-list) (car term-list))
+(define (rest-terms term-list) (cdr term-list))
+(define (make-term order coeff) (list order coeff)) ; 마디를 만들어 내는 프로시저
+(define (order term) (car term)) ; 차수
+(define (coeff term) (cadr term)) ; 계수
+(define (polynomial? x) (eq? (type-tag x) 'polynomial))
+
 (define (sparse-polynomial-package)
-    ; 변수variable 하나와 마디 리스트term-list 하나를 묶어서 다항식polynomial을 만듦
     (define (make-poly variable term-list) (cons variable term-list))
-    (define (variable p) (car p)) ; 다항식에서 변수를 찾아냄
-    (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
-
-    ; adjoin-term,  ... coeff procedure
-    (define (adjoin-term term term-list) 
-        (if (=zero? (coeff term)) term-list
-            (cons term term-list)))
-    (define (the-empty-termlist) '()) ; generate empty term list
-    (define (empty-termlist? term-list) (null? term-list))
-    (define (first-term term-list) (car term-list))
-    (define (rest-terms term-list) (cdr term-list))
-    (define (make-term order coeff) (list order coeff)) ; 마디를 만들어 내는 프로시저
-    (define (order term) (car term)) ; 차수
-    (define (coeff term) (cadr term)) ; 계수
-
     (define (add-poly p1 p2)
+    (display "add-poly: ") (newline)(display p1) (newline)(display p2) (newline)(newline)
         (if (same-variable? (variable p1) (variable p2)) 
             (make-poly (variable p1) (add-terms (term-list p1) (term-list p2)))
             (error "Polys not in same var -- ADD-POLY" (list p1 p2))))
@@ -407,14 +424,6 @@
 ; 2.89
 (define (dense-polynomial-package)
     (define (make-poly variable term-list) (cons variable term-list))
-    (define (variable p) (car p)) ; 다항식에서 변수를 찾아냄
-    (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
-    (define (the-empty-termlist) '()) ; generate empty term list
-    (define (empty-termlist? term-list) (null? term-list))
-    (define (first-term term-list) (car term-list))
-    (define (rest-terms term-list) (cdr term-list))
-    ; (define (order term) (car term)) ; 차수
-    ; (define (coeff term) (cadr term)) ; 계수
     (define (repeat-0 n) (if (>= 0 n) '() (cons 0 (repeat-0 (- n 1)))))
     (define (make-term order coeff) (append (list coeff) (repeat-0 order))) ; 마디를 만들어 내는 프로시저
     (define (add-poly p1 p2)
@@ -485,20 +494,21 @@
 (sparse-polynomial-package)
 ; 2.90
 (define (install-polynomial-package)
-    (define (variable p) (car p))
-    (define (term-list p) (cdr p))
+
     (define make-dense-poly (get 'make 'dense-poly))
     (define make-sparse-poly (get 'make 'sparse-poly))
     (define dense->sparse (get 'dense->sparse 'dense-poly))
     (define (dense? term-list)
         (cond 
-            ((null? term-list) #t) 
-            ((not (pair? (car term-list))) #t)
-            (else #f)))
+            ((empty-termlist? term-list) #t) 
+            ((polynomial? (first-term term-list)) #t)
+            ((pair? (first-term term-list)) #f)
+            (else #t)))
     (define (sparse? term-list)
         (cond 
-            ((null? term-list) #t)
-            ((pair? term-list) (pair? (car term-list)))
+            ((empty-termlist? term-list) #t)
+            ((polynomial? (first-term term-list)) #f)
+            ((pair? term-list) (pair? (first-term term-list)))
             (else #f)))
     (define (make-poly variable term-list)
         (cond 
@@ -507,6 +517,7 @@
             (else (error "term-list not valid -- MAKE-POLY" term-list))))
     
     (define (add-poly p1 p2) 
+        (display "poly-add-poly: ") (newline)(display p1)(newline) (display p2) (newline)(newline)
         (if (eq? (type-tag p1) (type-tag p2)) (add p1 p2)
             (add (dense->sparse p1) (dense->sparse p2))))
     (define (mul-poly p1 p2) 
@@ -527,12 +538,139 @@
     (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
     (put '=zero? '(polynomial) (lambda (x) (=zero? x)))
+
+    (put-coercion 'complex 'polynomial 
+        (lambda (x) (tag (make-poly 'var (list (list 0 (attach-tag 'complex x)))))))
+
+    (put 'project 'polynomial (lambda (x) (newline) (display "poly-proj : ")(display x)(newline)(display "->")(newline)(display (make-complex-from-real-imag (coeff (first-term (cdddr x))) 0)) (newline)(newline) 
+        (make-complex-from-real-imag (coeff (first-term (cdddr x))) 0)))
+    (put 'equ? '(polynomial polynomial) (lambda (p1 p2) (display "equ ") (display p1)(display p2) #t)) ; TODO: equ? 구현하기
     'done)
 (install-polynomial-package)
 (define make-poly (get 'make 'polynomial))
 
-(define p0 (make-poly 'x '(0)))
-(define p1 (make-poly 'x '((5 1) (0 -1))))
-(define p2 (make-poly 'x '((2 1) (0 -1))))
-
 ; 2.92
+(define x (make-poly 'x '(1 0))) ; x
+(define x0 (make-poly 'x '(0))) ; 0
+(define x+1 (make-poly 'x '((1 1) (0 1)))) ; x+1
+(define x-1 (make-poly 'x '((1 1) (0 -1)))) ; x-1
+(define y (make-poly 'y '(1 0)))  ; y
+(define y0 (make-poly 'y '(0)))  ; 0
+(define y+1 (make-poly 'y '((1 1) (0 1))))  ; y+1
+(define y-1 (make-poly 'y '((1 1) (0 -1))))  ; y-1
+(define z (make-poly 'z '(1 0)))  ; z
+(define z0 (make-poly 'z '(0)))  ; 0
+(define z+1 (make-poly 'z '((1 1) (0 1))))  ; z+1
+(define z-1 (make-poly 'z '((1 1) (0 -1))))  ; z-1
+
+; (add x+1 x-1) ; 2x ; (polynomial sparse-poly x (1 2))
+; (add x+1 y+1) ; x + y + 2 -> (polynomial sparse-poly x (1 1)) (polynomial sparse-poly y (1 1)) 2
+; (make-poly 'x (list (list 1 1) (list 0 (sub (mul y+1 (make-poly 'y '(2))) y)))) ; x + y + 2`
+; (polynomial sparse-poly x 
+;     (1 1) 
+;     (0 (polynomial sparse-poly y (1 1) (0 2))))
+
+(define y-test-poly '(polynomial sparse-poly y (1 1) (0 (polynomial sparse-poly x (1 1) (0 2)))))
+; y-test-poly ; (polynomial sparse-poly x (1 1) (0 (polynomial sparse-poly y (1 1) (0 2))))
+(define x-test-poly ; (y^2+1)x^3+(2y)x+1
+    (make-poly 'x (list (list 3 (make-poly 'y '((2 1) (0 1)))) (list 1 (make-poly 'y '((1 2)))) (list 0 1))))
+; x-test-poly ; (polynomial sparse-poly x (3 (polynomial sparse-poly y (2 1) (0 1))) (1 (polynomial sparse-poly y (1 2))) (0 1))
+
+(set! number-tower (append number-tower '(polynomial)))
+
+
+(define (remake-poly var term)
+    (map 
+        (lambda (x) 
+            ; (display x) (newline)
+            ; (display (coeff x)) (newline)
+            ; (display (make-poly (variable x) '((1 0)))) (newline)
+            (if (polynomial? (coeff x)) 
+                (if (eq? (variable (contents (coeff x))) var)
+                    ; (mul (coeff x) (make-poly 'y '((1 0))))
+                    (make-poly var (list (order x)))
+                    #f) 
+                #f)) 
+        term)
+    )
+; (remake-poly 'x (cdddr y-test-poly))
+; (remake-poly 'y (cdddr x-test-poly))
+x-test-poly ; (polynomial sparse-poly x (3 (polynomial sparse-poly y (2 1) (0 1))) (1 (polynomial sparse-poly y (1 2))) (0 1))
+; (cdddr x-test-poly)
+(define (test-rebuild poly var) ;rebuild poly by var variable.
+    (define orig-var (caddr poly))
+    (define terms (cdddr poly))
+    (filter (lambda (x) (not (null? x)))
+        (map
+            (lambda (x)
+                ; (display x)(newline)
+                (cond
+                    ((null? x) '())
+                    ((polynomial? (coeff x))
+                        ; (coeff x)
+                        ; (mul 
+                            (make-poly var (adjoin-term (make-term 0 (make-poly orig-var (adjoin-term (make-term (order x) 1) (the-empty-termlist)))) (the-empty-termlist)))
+                            ; (coeff x)
+                            ; )
+                    )
+                    (else x)
+                )
+            )
+        terms
+    ))
+    )
+; (test-rebuild x-test-poly 'y)
+(cdddr x-test-poly)
+
+
+; (null? (caddr (test-rebuild x-test-poly 'y)))
+; (filter (lambda (x) (not (null? x))) (list 1 '() 2))
+
+; (mul (make-poly 'y (0 1)))
+
+; test number->poly coercion
+; '(polynomial sparse-poly y (2 1) (0 1))
+; (raise 3)
+; (raise (raise 3))
+; (add 3 (raise (raise 3))) ; (complex rectangular 6 0)
+; (raise '(complex rectangular 6 0))
+; (add '(polynomial sparse-poly var (2 1) (0 1)) 3)
+; (add (add '(polynomial sparse-poly var (2 1) (0 1)) 3) (add '(polynomial sparse-poly var (2 1) (0 1)) 3))
+; (remake-poly (raise (raise 3)) 'y)
+
+
+; (add 1 (make-complex-from-real-imag 3 0))
+
+(define p1 (make-poly 'var (list (make-term 0 x+1) (make-term 0 y+1))))
+p1
+; (add p1 p1)
+; (project p1)
+(sub x+1 x-1)
+(define (drop-1 v)
+    (display "drop: ") (display v) (newline)
+    (if (or (boolean? v) 
+            (not (element-of-set? (type-tag v) number-tower)) 
+            (eq? (type-tag v) (car number-tower))) 
+        v
+        (let ((subtyped (project v)))
+            (if (equal? v (raise subtyped)) (drop-1 subtyped) 
+                v))))
+; (drop-1 (sub x+1 x-1))
+(project (sub x+1 x-1)) ; 2
+(raise (project (sub x+1 x-1)))
+(sub x+1 x-1)
+(sub (make-complex-from-real-imag 2 0) 2)
+; (sub (raise (project (sub x+1 x-1))) '(polynomial sparse-poly var (0 2)))
+; (equ? (raise (project (sub x+1 x-1))) (sub x+1 x-1))
+; (project (project (sub x+1 x-1))) ; 2
+; (drop-1 (sub x+1 x-1))
+; (raise (project (sub x+1 x-1))) ; (rational 2 . 1)
+; (equ? (project (sub x+1 x-1)) (raise (project (sub x+1 x-1))))
+; (define (drop-2 v)
+;     (if (element-of-set? (type-tag v) number-tower) 
+;         (let ([subtyped (project v)])
+;             (cond
+;                 ((null? subtyped)) v)
+;                 ((equal? (raise v) subtyped)) (drop-2 subtyped))
+;         v)
+; )

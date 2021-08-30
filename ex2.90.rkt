@@ -445,16 +445,21 @@
     (define make-dense-poly (get 'make 'dense-poly))
     (define make-sparse-poly (get 'make 'sparse-poly))
     (define dense->sparse (get 'dense->sparse 'dense-poly))
-    ; (define (first-term term-list) (car term-list))
+    (define (first-term term-list) (car term-list))
+    (define (rest-terms term-list) (cdr term-list))
+    (define (empty-termlist? term-list) (null? term-list))
+    (define (polynomial? x) (eq? (type-tag x) 'polynomial))
     (define (dense? term-list)
         (cond 
-            ((null? term-list) #t) 
-            ((not (pair? (car term-list))) #t)
-            (else #f)))
+            ((empty-termlist? term-list) #t) 
+            ((polynomial? (first-term term-list)) #t)
+            ((pair? (first-term term-list)) #f)
+            (else #t)))
     (define (sparse? term-list)
         (cond 
-            ((null? term-list) #t)
-            ((pair? term-list) (pair? (car term-list)))
+            ((empty-termlist? term-list) #t)
+            ((polynomial? (first-term term-list)) #f)
+            ((pair? term-list) (pair? (first-term term-list)))
             (else #f)))
     (define (make-poly variable term-list)
         (cond 
@@ -495,3 +500,32 @@
 (sub p1 p2) ; (polynomial sparse-poly x)
 (=zero? (mul p1 p2)) ; #f
 (=zero? (sub p1 p2)) ; #t
+; 다항식을 계수로 가질 때
+
+(define (first-term term-list) (car term-list))
+(define (rest-terms term-list) (cdr term-list))
+(define (empty-termlist? term-list) (null? term-list))
+(define (polynomial? x) (eq? (type-tag x) 'polynomial))
+(define (sparse? term-list)
+    (cond 
+        ((empty-termlist? term-list) #t)
+        ((polynomial? (first-term term-list)) #f)
+        ((pair? term-list) (pair? (first-term term-list)))
+        (else #f)))
+(define (dense? term-list)
+    (cond 
+        ((empty-termlist? term-list) #t) 
+        ((polynomial? (first-term term-list)) #t)
+        ((pair? (first-term term-list)) #f)
+        (else #t)))
+
+(display "sparse-test")(newline)
+(sparse? (list (list p1 2) (list p2 1))) ; #t
+(dense? (list (list p1 2) (list p2 1))) ; #f
+(sparse? (list (list 1 2) (list p2 1))) ; #t
+(dense? (list (list 1 2) (list p2 1))) ; #f
+(display "dense-test")(newline)
+(sparse? (list p1 p2 0)) ; #t -> #f
+(dense? (list p1 p2 0)) ; #f -> #t
+(sparse? (list 1 p2 0)) ; #f -> #f
+(dense? (list 1 p2 0)) ; #t -> #t

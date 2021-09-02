@@ -44,17 +44,12 @@
         ((pair? lists) (if (proc (car lists)) #t (any proc (cdr lists))))
         (else (proc lists))))
 (define (drop v)
-    (define (drop-1 v p)
-        (let ([vt (list-index (type-tag v) number-tower)] 
-              [pt (list-index (type-tag p) number-tower)])
-            (cond
-                ((equal? v p) #t)
-                ((> vt pt) (drop-1 v (raise p)))
-                (else #f))))
-    (if (or (boolean? v) (not (element-of-set? (type-tag v) number-tower)) (eq? (type-tag v) (car number-tower))) v
+    (if (or (not (pair? v)) 
+            (not (element-of-set? (type-tag v) number-tower)) 
+            (eq? (type-tag v) (car number-tower))) 
+        v
         (let ([subtyped (project v)])
-            (if (drop-1 v subtyped) (drop subtyped) 
-            ; (if (equal? v (raise subtyped)) (drop subtyped) 
+            (if (equ? v (raise subtyped)) (drop subtyped) 
                 v))))
 (define (list-equal? m)
     (cond
@@ -67,6 +62,7 @@
     (define (apply-generic-1 op args)
         (let* ([type-tags (map type-tag args)] 
                [proc (get op type-tags)])
+                ; (display "type-tags")(display type-tags) (display args) (newline)
             (if (not (null? proc)) (drop (apply proc (map contents args)))
                 (let* ([levelmap (map (lambda (x) (list-index x number-tower)) type-tags)]
                        [coercedargs ((lambda (elems) 
@@ -411,16 +407,33 @@
             (error "Polys not in same var -- DIV-POLY" (list p1 p2))))
     (put 'div '(sparse-poly sparse-poly) (lambda (p1 p2) 
         (let ((div-result (div-poly p1 p2))) (map tag div-result))))
+    ; (define (gcd-terms a b)
+    ;     (if (empty-termlist? b) a
+    ;         (gcd-terms b (remainder-terms a b))))
+    ; 2.96
     (define (gcd-terms a b)
+        (let* ( [result (gcd-terms-1 a b)]
+                [coeff-gcd (apply gcd (map (lambda (x) (coeff x)) result))])
+            (car (div-terms (gcd-terms-1 a b) (adjoin-term (make-term 0 coeff-gcd) (the-empty-termlist))))))
+    (define (gcd-terms-1 a b)
         (if (empty-termlist? b) a
-            (gcd-terms b (remainder-terms a b))))
+            (gcd-terms-1 b (pseudoremainder-terms a b))))
     ; 2.94
-    (define (remainder-terms a b) (cadr (div-terms a b)))
     (define (gcd-poly p1 p2)
         (if (same-variable? (variable p1) (variable p2))
             (make-poly (variable p1) (gcd-terms (term-list p1) (term-list p2)))
             (error "Polys not in same var -- GCD-POLY" (list p1 p2))))
     (put 'gcd '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (gcd-poly p1 p2))))
+    ; 2.96
+    (define (remainder-terms a b) (cadr (div-terms a b)))
+    (define (integerizing-factor L1 L2)
+        (let ([o1 (order (first-term L1))]
+            [o2 (order (first-term L2))]
+            [c (coeff (first-term L2))])
+            (exp c (add 1 (sub o1 o2)))))
+    (define (pseudoremainder-terms a b)
+        (let ([factor-term (make-term 0 (integerizing-factor a b))])
+            (remainder-terms (mul-term-by-all-terms factor-term a) b)))
     'done)
 
 ; 2.89
@@ -556,10 +569,10 @@
 (install-polynomial-package)
 (define make-poly (get 'make 'polynomial))
 
-(define p1 (make-poly 'x '((2 1) (1 -2) (0 1))))
-(define p2 (make-poly 'x '((2 11) (0 7))))
-(define p3 (make-poly 'x '((1 13) (0 5))))
-(define q1 (mul p1 p2))
-(define q2 (mul p1 p3))
-(greatest-common-divisor q1 q2) ; (polynomial sparse-poly x (2 (rational 18954 . 2197)) (1 (rational -37908 . 2197)) (0 (rational 1458 . 169)))
-; div-term (new-c (div (coeff t1) (coeff t2)))
+(define p (mul (make-poly 'x '((2 1) (1 -2) (0 1))) (make-poly 'x '((2 11) (0 7)))))
+(define q (mul (make-poly 'x '((2 1) (1 -2) (0 1))) (make-poly 'x '((1 13) (0 5)))))
+
+p ; (polynomial sparse-poly x (4 11) (3 -22) (2 18) (1 -14) (0 7))
+q ; (polynomial sparse-poly x (3 13) (2 -21) (1 3) (0 5))
+; (greatest-common-divisor p q) ; (polynomial sparse-poly x (2 1458) (1 -2916) (0 1458))
+(greatest-common-divisor p q) ; (polynomial sparse-poly x (2 1) (1 -2) (0 1))

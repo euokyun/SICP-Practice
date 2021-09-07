@@ -22,6 +22,7 @@
         (else (cons type-tag contents))))
 (define (type-tag datum)
     (cond
+        ((boolean? datum) 'boolean)
         ((integer? datum) 'scheme-integer)
         ((number? datum) 'scheme-number)
         ((symbol? datum) 'symbol)
@@ -49,20 +50,19 @@
             (eq? (type-tag v) (car number-tower))) 
         v
         (let ([subtyped (project v)])
-            (if (equ? v (raise subtyped)) (drop subtyped) 
-                v))))
+            (cond 
+                [(equ? v (raise subtyped)) (drop subtyped)]
+                [else v]))))
 (define (list-equal? m)
     (cond
         ((null? m) #t)
         ((null? (cdr m)) #t)
         ((equal? (car m) (cadr m)) (list-equal? (cdr m)))
         (else #f)))
-
 (define (apply-generic op . args)
     (define (apply-generic-1 op args)
-        (let* ([type-tags (map type-tag args)] 
-               [proc (get op type-tags)])
-                ; (display "type-tags")(display type-tags) (display args) (newline)
+        (let* ([type-tags (map type-tag args)]
+        [proc (get op type-tags)])
             (if (not (null? proc)) (drop (apply proc (map contents args)))
                 (let* ([levelmap (map (lambda (x) (list-index x number-tower)) type-tags)]
                        [coercedargs ((lambda (elems) 
@@ -79,17 +79,6 @@
                     (apply-generic-1 op coercedargs)))))
         (apply-generic-1 op args))
 
-(define (apply-coercion elems) 
-    (let ((levelmap (map (lambda (x) (list-index (type-tag x) number-tower)) elems))) ; 인자가 하나면 에러남.
-        (if (any (lambda (x) (eq? x #f)) levelmap) (error "error: not in type tree -- APPLY-COERCION" elems)
-            (if (list-equal? levelmap) (map raise elems)
-                (let ((maxlevel (apply max levelmap)))
-                    (apply map 
-                        (lambda (e l) 
-                            (cond
-                                ((= l maxlevel) e)
-                                ((< l maxlevel) ((repeated raise (- maxlevel l)) e))))
-                        (list elems levelmap)))))))
 (define (install-rectangular-package)
     (define real-part car)
     (define imag-part cdr)
@@ -140,21 +129,25 @@
     (put-coercion 'scheme-number 'complex (lambda (x) (tag (make-complex-from-real-imag x 0))))
     (put 'raise 'scheme-number (lambda (x) ((get-coercion 'scheme-number 'complex) (contents x))))
     (put 'project 'scheme-number (lambda (x) (make-rational (contents x) 1)))
-    
     (put 'sqrt-number '(scheme-number) (lambda (x) (sqrt (contents x))))
-    ; 2.94
-    (put 'gcd '(scheme-number scheme-number) (lambda (r1 r2) (tag (gcd r1 r2))))
+    ; (define (reduce-integers n d)
+    ;     (display "reduce : ")(display n)(display ", ")(display d) (newline)
+    ;     (let ([g (gcd n d)])
+    ;         (list (/ n g) (/ d g))))
+    ; (put 'reduce '(scheme-number scheme-number) (lambda (n d) (tag (reduce-integers n d))))
     'done)
 
 (define (install-rational-package)
     (define numer car)
-    (define denom cdr)  
+    (define denom cadr)  
     ; (define (make-rat n d) 
     ;     (let ((g (gcd n d)))
     ;         (cons (/ n g) (/ d g))))
     ; 2.93
-    (define (make-rat n d) 
-        (cons n d))
+    ; (define (make-rat n d) 
+        ; (cons n d))
+    ; 2.97
+    (define (make-rat n d) (reduce n d))
     (define (add-rat x y)
         (make-rat
             (add (mul (numer x) (denom y)) (mul (numer y) (denom x)))
@@ -182,9 +175,12 @@
     (put 'equ? '(rational rational) (lambda (rat1 rat2) (equ? (mul (numer rat1) (denom rat2)) (mul (numer rat2) (denom rat1)))))
         ; (and (equ? (numer rat1) (numer rat2)) (equ? (denom rat1) (denom rat2)))))
     (put '=zero? '(rational) (lambda (n) (= 0 (numer n))))
-    (put-coercion 'rational 'scheme-number (lambda (x) (make-scheme-number (/ (car x) (cdr x)))))
+    (put-coercion 'rational 'scheme-number (lambda (x) (make-scheme-number (div (numer x) (denom x)))))
     (put 'raise 'rational (lambda (x) ((get-coercion 'rational 'scheme-number) (contents x))))
-    (put 'project 'rational (lambda (x) (make-scheme-integer (/ (numer (contents x)) (denom (contents x))))))
+    (put 'project 'rational (lambda (x) 
+        (if (or (polynomial? (numer (contents x))) (polynomial? (denom (contents x)))) x
+            (make-scheme-integer (quotient (numer (contents x)) (denom (contents x)))))))
+    ; (put 'project 'rational (lambda (x) (/ (numer (contents x)) (denom (contents x)))))
     'done)
 
 (define (install-complex-package)
@@ -230,13 +226,16 @@
     (put 'add '(scheme-integer scheme-integer) (lambda (x y) (tag (+ x y))))
     (put 'sub '(scheme-integer scheme-integer) (lambda (x y) (tag (- x y))))
     (put 'mul '(scheme-integer scheme-integer) (lambda (x y) (tag (* x y))))
-    ; ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
+    ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
+    ; (put 'div '(scheme-integer scheme-integer) (lambda (x y) (tag (quotient x y))))
     (put 'make 'scheme-integer (lambda (x) (tag x)))
     (put 'equ? '(scheme-integer scheme-integer) (lambda (n1 n2) (= n1 n2)))
     (put '=zero? '(scheme-integer) (lambda (n) (= 0 n)))
     (put 'exp '(scheme-integer scheme-integer) (lambda (x y) (tag (expt x y))))
     (put-coercion 'scheme-integer 'rational (lambda (x) (make-rational x 1)))
     (put 'raise 'scheme-integer (lambda (x) ((get-coercion 'scheme-integer 'rational) (contents x))))
+    (define (reduce-integers n d) (let ([g (gcd n d)]) (list (/ n g) (/ d g))))
+    (put 'reduce '(scheme-integer scheme-integer) (lambda (n d) (reduce-integers n d)))
     'done)
 
 (install-scheme-integer-package)
@@ -353,7 +352,7 @@
                 (mul-terms (rest-terms L1) L2))))
     (define (mul-term-by-all-terms t1 L)
         (if (empty-termlist? L) (the-empty-termlist)
-            (let ((t2 (first-term L)))
+            (let ([t2 (first-term L)])
                 (adjoin-term 
                     (make-term 
                         (+ (order t1) (order t2))
@@ -383,41 +382,40 @@
     (put 'sub '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (sub-poly p1 p2))))
     ; 2.91
     (define (div-terms L1 L2)
-        ; (display "div-terms ")(display L1)(display " | ")(display L2)(newline)
         (if (empty-termlist? L1) (list (the-empty-termlist) (the-empty-termlist))
             (let ([t1 (first-term L1)] [t2 (first-term L2)])
                 (if (< (order t1) (order t2)) (list (the-empty-termlist) L1)
-                    ; 2.95 new-c is rational!!!!!
-                    (let ((new-c (div (coeff t1) (coeff t2))) ; 몫
-                        (new-o (- (order t1) (order t2)))) ; 차수
+                    (let ([new-c (div (coeff t1) (coeff t2))] ; 몫
+                        [new-o (- (order t1) (order t2))]) ; 차수
                         (let ([rest-of-result 
                             (div-terms 
                                 (add-terms L1 
-                                    (mul-term-by-all-terms 
-                                        (make-term new-o (mul -1 new-c)) 
-                                        L2)) 
+                                    (mul-term-by-all-terms (make-term 0 -1) 
+                                        (mul-term-by-all-terms (make-term new-o new-c) L2))) 
                                 L2)])
                             (list (cons (make-term new-o new-c) (car rest-of-result)) (cadr rest-of-result))))))))
     (define (div-poly p1 p2)
         (if (same-variable? (variable p1) (variable p2)) 
-            (let ((div-term-result (div-terms (term-list p1) (term-list p2))))
-                (list 
-                    (make-poly (variable p1) (car div-term-result))
-                    (make-poly (variable p1) (cdr div-term-result))))
+            (let ([div-term-result (div-terms (term-list p1) (term-list p2))])
+                (map (lambda (x) (make-poly (variable p1) x)) div-term-result))
             (error "Polys not in same var -- DIV-POLY" (list p1 p2))))
-    (put 'div '(sparse-poly sparse-poly) (lambda (p1 p2) 
-        (let ((div-result (div-poly p1 p2))) (map tag div-result))))
+    ; (put 'div '(sparse-poly sparse-poly) (lambda (p1 p2) 
+    ;     (let ((div-result (div-poly p1 p2))) (map tag div-result))))
+    (put 'div '(sparse-poly sparse-poly) (lambda (p1 p2) (tag (car (div-poly p1 p2)))))
+
+    (define (constant-term n) (adjoin-term (make-term 0 n) (the-empty-termlist)))
+
     ; (define (gcd-terms a b)
     ;     (if (empty-termlist? b) a
     ;         (gcd-terms b (remainder-terms a b))))
     ; 2.96
     (define (gcd-terms a b)
+        (define (gcd-terms-1 a b)
+            (if (empty-termlist? b) a
+                (gcd-terms-1 b (pseudoremainder-terms a b))))
         (let* ( [result (gcd-terms-1 a b)]
                 [coeff-gcd (apply gcd (map (lambda (x) (coeff x)) result))])
-            (car (div-terms (gcd-terms-1 a b) (adjoin-term (make-term 0 coeff-gcd) (the-empty-termlist))))))
-    (define (gcd-terms-1 a b)
-        (if (empty-termlist? b) a
-            (gcd-terms-1 b (pseudoremainder-terms a b))))
+            (car (div-terms result (constant-term coeff-gcd)))))
     ; 2.94
     (define (gcd-poly p1 p2)
         (if (same-variable? (variable p1) (variable p2))
@@ -434,6 +432,26 @@
     (define (pseudoremainder-terms a b)
         (let ([factor-term (make-term 0 (integerizing-factor a b))])
             (remainder-terms (mul-term-by-all-terms factor-term a) b)))
+    ; 2.97 - a
+    (define (reduce-terms n d) 
+        (let* ( [g (gcd-terms n d)] ; gcd를 구한다.
+                [top-order (if (> (order (first-term n)) (order (first-term d))) n d)] ; O_1
+                [factor-term (make-term 0 (integerizing-factor top-order g))]
+                [nn (car (div-terms (mul-term-by-all-terms factor-term n) g))]
+                [dd (car (div-terms (mul-term-by-all-terms factor-term d) g))]
+                [gg (constant-term (apply gcd (append (map (lambda (x) (coeff x)) nn) (map (lambda (x) (coeff x)) dd))))]) 
+            (list
+                (car (div-terms nn gg))
+                (car (div-terms dd gg)))))
+    (define (reduce-poly p1 p2)
+        (if (same-variable? (variable p1) (variable p2)) 
+            (let ([reduced (reduce-terms (term-list p1) (term-list p2))])
+                (map (lambda (x) (make-poly (variable p1) x)) reduced))
+            (error "Polys not in same var -- REDUCE-POLY" (list p1 p2))))
+
+    (put 'reduce '(sparse-poly sparse-poly) (lambda (p1 p2) (map tag (reduce-poly p1 p2))))
+    ; (put 'equ? '(sparse-poly sparse-poly) (lambda (p1 p2) (=zero-poly? (sub-poly p1 p2))))
+    ; (put 'equ? '(sparse-poly sparse-poly) (lambda (p1 p2) (equal? p1 p2)))
     'done)
 
 ; 2.89
@@ -509,7 +527,6 @@
 (dense-polynomial-package)
 (sparse-polynomial-package)
 (define (greatest-common-divisor r1 r2) (apply-generic 'gcd r1 r2))
-; 2.90
 (define (install-polynomial-package)
     (define (variable p) (car p))
     (define (term-list p) (cdr p)) ; 다항식에서 마디 리스트를 찾아냄 
@@ -519,7 +536,6 @@
     (define (first-term term-list) (car term-list))
     (define (rest-terms term-list) (cdr term-list))
     (define (empty-termlist? term-list) (null? term-list))
-    (define (polynomial? x) (eq? (type-tag x) 'polynomial))
     (define (dense? term-list)
         (cond 
             ((empty-termlist? term-list) #t) 
@@ -551,8 +567,7 @@
     (define (div-poly p1 p2) 
         (if (eq? (type-tag p1) (type-tag p2)) (div p1 p2)
             (div (dense->sparse p1) (dense->sparse p2))))
-    (put 'div '(polynomial polynomial) 
-        (lambda (p1 p2) (let ((div-result (div-poly p1 p2))) (map tag div-result))))
+    (put 'div '(polynomial polynomial) (lambda (p1 p2) (tag (div-poly p1 p2))))
     ; 2.94
     (define (gcd-poly p1 p2) 
         (if (eq? (type-tag p1) (type-tag p2)) (greatest-common-divisor p1 p2)
@@ -565,14 +580,42 @@
     (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (mul-poly p1 p2))))
     (put 'sub '(polynomial polynomial) (lambda (p1 p2) (tag (sub-poly p1 p2))))
     (put '=zero? '(polynomial) (lambda (x) (=zero? x)))
+    ; 2.97
+    (define (reduce-poly p1 p2) 
+        (if (eq? (type-tag p1) (type-tag p2)) (reduce p1 p2)
+            (reduce (dense->sparse p1) (dense->sparse p2))))
+    (put 'reduce '(polynomial polynomial) (lambda (p1 p2) (map tag (reduce-poly p1 p2))))
+    ; (put 'equ? '(polynomial polynomial) 
+    ;     (lambda (p1 p2) 
+    ;         (if (eq? (type-tag p1) (type-tag p2)) (equ? p1 p2)
+    ;             (equ? (dense->sparse p1) (dense->sparse p2)))))
     'done)
 (install-polynomial-package)
 (define make-poly (get 'make 'polynomial))
+(define (polynomial? x) (eq? (type-tag x) 'polynomial))
+
 
 (define p (mul (make-poly 'x '((2 1) (1 -2) (0 1))) (make-poly 'x '((2 11) (0 7)))))
 (define q (mul (make-poly 'x '((2 1) (1 -2) (0 1))) (make-poly 'x '((1 13) (0 5)))))
 
-p ; (polynomial sparse-poly x (4 11) (3 -22) (2 18) (1 -14) (0 7))
-q ; (polynomial sparse-poly x (3 13) (2 -21) (1 3) (0 5))
-; (greatest-common-divisor p q) ; (polynomial sparse-poly x (2 1458) (1 -2916) (0 1458))
-(greatest-common-divisor p q) ; (polynomial sparse-poly x (2 1) (1 -2) (0 1))
+; p ; (polynomial sparse-poly x (4 11) (3 -22) (2 18) (1 -14) (0 7))
+; q ; (polynomial sparse-poly x (3 13) (2 -21) (1 3) (0 5))
+
+; ((get 'reduce '(sparse-poly sparse-poly)) (cddr p) (cddr q))
+; ((get 'reduce '(sparse-poly sparse-poly)) (cddr p) (cddr p))
+
+(define (reduce n d) (apply-generic 'reduce n d))
+
+; (add (make-rational (add p q) q) (make-rational (add p q) q))
+(define (add-rat x y)
+    (define numer cadr)
+    (define denom caddr)  
+    (reduce 
+        (add (mul (numer x) (denom y)) (mul (numer y) (denom x)))
+        (mul (denom x) (denom y))))
+(add-rat (make-rational (add p q) q) (make-rational (add p q) q))
+; ((polynomial sparse-poly x (2 22) (1 26) (0 24)) (polynomial sparse-poly x (1 13) (0 5)))
+(apply div (add-rat (make-rational (add p q) q) (make-rational (add p q) q)))
+; (polynomial sparse-poly x (1 (rational 22 13)) (0 (rational 228 169)))
+
+; give up. need to add rational->polynomial raise, project and equ?

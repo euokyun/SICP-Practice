@@ -13,7 +13,7 @@
 (define (repeated f n) (if (> n 1) (compose f (repeated f (- n 1))) f))
 (define (attach-tag type-tag contents)
     (cond
-        ((integer? contents) contents) ; not showing (scheme-integer ) thing
+        ; ((integer? contents) contents) ; not showing (scheme-integer ) thing
         ; ((number? contents) contents)
         ; ((symbol? contents) contents)
         (else (cons type-tag contents))))

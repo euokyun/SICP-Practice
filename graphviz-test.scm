@@ -1,3 +1,5 @@
+;; https://github.com/zv/SICP-guile
+;; only works with guile. not working in racket.
 (define (list->graphviz lst)
   """Convert a list into a set of Graphviz instructions"""
   (define number 0)
